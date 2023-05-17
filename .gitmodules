@@ -1,3 +1,6 @@
 [submodule "DJITelloPy"] 
   path = DJITelloPy
   url = https://github.com/damiafuentes/DJITelloPy/blob/master/djitellopy/tello.py
+[submodule "tello-gesture-control"]
+	path = tello-gesture-control
+	url = https://github.com/kinivi/tello-gesture-control
