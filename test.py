@@ -18,7 +18,7 @@ while True:
 #    dist = tello.get_distance_tof()
 #    print(f"Distance {dist} cm. \n")
 
-#tello.end()
+tello.end()
 #tello.takeoff()
 
 #tello.move_left(100)
