@@ -1,6 +1,7 @@
-from djitellopy import Tello
-import cv2, math, time
+import cv2
+import numpy as np
 
+cap = cv2.VideoCapture(1)
 
 def findFace(img):
     faceCascade = cv2.CascadeClassifier("codes/face_tracking/haarcascades/haarcascade_frontalface_default.xml")
@@ -22,29 +23,9 @@ def findFace(img):
     else:
         return img, [[0,0], 0]
 
-tello = Tello()
-
-tello.connect()
-
-tello.streamon()
-frame_read = tello.get_frame_read()
-
 while True:
-    img = tello.get_frame_read().frame
-    proc_img, face_info = findFace(img)
+    _, img = cap.read()
+    img, face_info = findFace(img)
     print("Center: {} - Area: {}".format(face_info[0], face_info[1]))
-    cv2.imshow('stream', proc_img)
+    cv2.imshow("Output", img)
     cv2.waitKey(1)
-
-#for x in range (200):
-#    dist = tello.get_distance_tof()
-#    print(f"Distance {dist} cm. \n")p
-
-tello.end()
-#tello.takeoff()
-
-#tello.move_left(100)
-#tello.rotate_clockwise(90)
-#tello.move_forward(100)
-
-#tello.land()
