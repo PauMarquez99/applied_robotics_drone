@@ -2,7 +2,7 @@ from djitellopy import Tello
 import cv2, math, time
 
 
-def findFace(img):
+def FindFace(img):
     faceCascade = cv2.CascadeClassifier("codes/face_tracking/haarcascades/haarcascade_frontalface_default.xml")
     imgGray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = faceCascade.detectMultiScale(imgGray, 1.2, 8)
@@ -22,29 +22,37 @@ def findFace(img):
     else:
         return img, [[0,0], 0]
 
-def closeness(distance):
-    if distance > 70000:
+def Closeness(area_avg):
+    if area_avg < 75000:
         move = "forward"
         #tello.move_forward(10)
-    elif distance < 58500:
+    elif area_avg > 60000:
         move = "backwards"
         #tello.move_back(10)
     else:
         move = "nada"
     return move
 
+def GetAreaAvg(curr_area):
+    global area_list
+    area_list = area_list[-1:] +  area_list[:-1]
+    area_list[0] = curr_area
+    return sum(area_list) / len(area_list)
+
 tello = Tello()
 tello.connect()
 tello.streamon()
 frame_read = tello.get_frame_read()
+
+area_list = [67000] * 10
 
 while True:
     key = cv2.waitKey(1)
     if key == 27:  # ESC
         break
     img = tello.get_frame_read().frame
-    proc_img, face_info = findFace(img)
-    move = closeness(face_info[1])
+    proc_img, face_info = FindFace(img)
+    move = Closeness(GetAreaAvg(face_info[1]))
     print("Center: {} - Area: {} - Move: {}".format(face_info[0], face_info[1], move))
     cv2.imshow('stream', proc_img)
 
