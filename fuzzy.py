@@ -1,7 +1,24 @@
-import cv2, math, time
-import numpy as np
+import cv2, threading
+
+############### GLOBAL VARIABLES ###############
+
+img = 0
+proc_img = 0
+face_center = [0,0]
+face_area = 0
+lr_y = [0, 0]
+vel_ud = 0
+vel_cf = 0
+fuzzy = False
+find_face = False
+show_video = False
+print_res_find_face = False
+print_res_fuzzy = False
+
+############### CONSTANTS ###############
 
 CENTER_IMG_X = 960
+
 CENTER_IMG_Y = 540
 
 INPUT_FIG_LR = [
@@ -49,25 +66,43 @@ RULES_CF = {
     "far":    66,
 }
 
-def findFace(img):
-    faceCascade = cv2.CascadeClassifier("codes/face_tracking/haarcascades/haarcascade_frontalface_default.xml")
-    imgGray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    faces = faceCascade.detectMultiScale(imgGray, 1.2, 7)
+############### FUNCTIONS ###############
 
-    faces_center_list = []
-    faces_area_list = []
+def findFace():
+    global proc_img
+    global face_center
+    global face_area
+    global fuzzy
+    global show_video
+    global print_res_find_face
 
-    for (x,y,w,h) in faces:
-        cv2.rectangle(img, (x,y), (x+w,y+h), (0,0,255), 2)
-        faces_center_list.append([x+w//2,y+h//2])
-        faces_area_list.append(w*h)
-        cv2.circle(img, (x+w//2,y+h//2), 5, (0,255,0), cv2.FILLED)
-    
-    if len(faces_area_list) > 0:
-        i = faces_area_list.index(max(faces_area_list))
-        return img, faces_center_list[i], faces_area_list[i]
-    else:
-        return img, [0,0], 0
+    if find_face:
+        faceCascade = cv2.CascadeClassifier("codes/face_tracking/haarcascades/haarcascade_frontalface_default.xml")
+        imgGray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        faces = faceCascade.detectMultiScale(imgGray, 1.2, 7)
+
+        faces_center_list = []
+        faces_area_list = []
+
+        for (x,y,w,h) in faces:
+            cv2.rectangle(img, (x,y), (x+w,y+h), (0,0,255), 2)
+            faces_center_list.append([x+w//2,y+h//2])
+            faces_area_list.append(w*h)
+            cv2.circle(img, (x+w//2,y+h//2), 5, (0,255,0), cv2.FILLED)
+        
+        proc_img = img
+
+        if len(faces_area_list) > 0:
+            i = faces_area_list.index(max(faces_area_list))
+            face_center = faces_center_list[i]
+            face_area = faces_area_list[i]
+        else:
+            face_center = [0,0]
+            face_area = 0
+
+        fuzzy = True
+        show_video = True
+        print_res_find_face = True
 
 def getFigPos(x, input_fig):
     res = []
@@ -132,30 +167,72 @@ def defuzzify(info):
     else:
         return 0
 
-def fuzzify(x, y, a):
-    descriptions_LR = getFigPos(x, INPUT_FIG_LR)
-    membership_values_LR = getMembershipValues(descriptions_LR, x)
-    info_LR = getFiredRules(membership_values_LR, RULES_LR)
+def fuzzify():
+    global lr_y
+    global vel_ud
+    global vel_cf
+    global print_res_fuzzy
 
-    descriptions_UD = getFigPos(y, INPUT_FIG_UD)
-    membership_values_UD = getMembershipValues(descriptions_UD, y)
-    info_UD = getFiredRules(membership_values_UD, RULES_UD)
+    if fuzzy:
+        x = CENTER_IMG_X-face_center[0]
+        y = CENTER_IMG_Y-face_center[1]
+        a = face_area
 
-    descriptions_CF = getFigPos(a, INPUT_FIG_CF)
-    membership_values_CF = getMembershipValues(descriptions_CF, a)
-    info_CF = getFiredRules(membership_values_CF, RULES_CF)
+        descriptions_LR = getFigPos(x, INPUT_FIG_LR)
+        membership_values_LR = getMembershipValues(descriptions_LR, x)
+        info_LR = getFiredRules(membership_values_LR, RULES_LR)
+
+        descriptions_UD = getFigPos(y, INPUT_FIG_UD)
+        membership_values_UD = getMembershipValues(descriptions_UD, y)
+        info_UD = getFiredRules(membership_values_UD, RULES_UD)
+
+        descriptions_CF = getFigPos(a, INPUT_FIG_CF)
+        membership_values_CF = getMembershipValues(descriptions_CF, a)
+        info_CF = getFiredRules(membership_values_CF, RULES_CF)
+        
+        lr_y = defuzzifyLR(info_LR)
+        vel_ud = defuzzify(info_UD)
+        vel_cf = defuzzify(info_CF)
     
-    return defuzzifyLR(info_LR), defuzzify(info_UD), defuzzify(info_CF)
+    print_res_fuzzy = True
     
+def getVideo():
+    global img
+    global find_face
+
+    _, img = vid.read()
+    (h, w) = img.shape[:2]
+    cv2.circle(img, (w//2, h//2), 7, (255, 255, 255), -1)
+
+    find_face = True
+
+def showVideo():
+    if show_video:
+        cv2.imshow('stream', proc_img)
+
+############### MAIN ###############
+
 vid = cv2.VideoCapture(1)
 
 while True:
-    ret, img = vid.read()
-    (h, w) = img.shape[:2]
-    cv2.circle(img, (w//2, h//2), 7, (255, 255, 255), -1)
-    proc_img, face_center, face_area= findFace(img)
-    lr_y, vel_ud, vel_cf = fuzzify(CENTER_IMG_X-face_center[0], CENTER_IMG_Y-face_center[1], face_area)
-    print("D_X: {} \t D_Y: {} \t A: {}\n".format(CENTER_IMG_X-face_center[0], CENTER_IMG_Y-face_center[1], face_area))
-    print("V_LF: {} - V_Y: {} - V_UD: {} - V_CF: {}".format(int(lr_y[0]), int(lr_y[1]), int(vel_ud), int(vel_cf)))
-    cv2.imshow('stream', proc_img)
-    cv2.waitKey(1)
+    t_get_video = threading.Thread(target=getVideo, args=())
+    t_find_face = threading.Thread(target=findFace, args=())
+    t_fuzzify = threading.Thread(target=fuzzify, args=())
+    t_show_video = threading.Thread(target=showVideo)
+
+    if print_res_fuzzy and print_res_find_face:
+        print("D_X: {} \t D_Y: {} \t A: {}\n".format(CENTER_IMG_X-face_center[0], CENTER_IMG_Y-face_center[1], face_area))
+        print("V_LF: {} - V_Y: {} - V_UD: {} - V_CF: {}".format(int(lr_y[0]), int(lr_y[1]), int(vel_ud), int(vel_cf)))
+
+    t_get_video.start()
+    t_find_face.start()
+    t_fuzzify.start()
+    t_show_video.start()
+
+    t_get_video.join()
+    t_find_face.join()
+    t_fuzzify.join()
+    t_show_video.join()
+
+    if cv2.waitKey(1) == 27:
+        break
