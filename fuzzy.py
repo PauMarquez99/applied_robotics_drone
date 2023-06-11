@@ -1,7 +1,9 @@
 import cv2, threading
 
+
 ############### GLOBAL VARIABLES ###############
 
+vid = cv2.VideoCapture(1)
 img = 0
 proc_img = 0
 face_center = [0,0]
@@ -14,6 +16,7 @@ find_face = False
 show_video = False
 print_res_find_face = False
 print_res_fuzzy = False
+
 
 ############### CONSTANTS ###############
 
@@ -65,6 +68,7 @@ RULES_CF = {
     "med":    0,
     "far":    66,
 }
+
 
 ############### FUNCTIONS ###############
 
@@ -206,19 +210,13 @@ def getVideo():
 
     find_face = True
 
-def showVideo():
-    if show_video:
-        cv2.imshow('stream', proc_img)
 
 ############### MAIN ###############
-
-vid = cv2.VideoCapture(1)
 
 while True:
     t_get_video = threading.Thread(target=getVideo, args=())
     t_find_face = threading.Thread(target=findFace, args=())
     t_fuzzify = threading.Thread(target=fuzzify, args=())
-    t_show_video = threading.Thread(target=showVideo)
 
     if print_res_fuzzy and print_res_find_face:
         print("D_X: {} \t D_Y: {} \t A: {}\n".format(CENTER_IMG_X-face_center[0], CENTER_IMG_Y-face_center[1], face_area))
@@ -227,12 +225,13 @@ while True:
     t_get_video.start()
     t_find_face.start()
     t_fuzzify.start()
-    t_show_video.start()
 
     t_get_video.join()
     t_find_face.join()
     t_fuzzify.join()
-    t_show_video.join()
+
+    if show_video:
+        cv2.imshow('stream', proc_img)
 
     if cv2.waitKey(1) == 27:
         break
