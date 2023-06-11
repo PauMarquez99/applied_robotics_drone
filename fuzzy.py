@@ -1,4 +1,8 @@
 import cv2, math, time
+import numpy as np
+
+CENTER_IMG_X = 960
+CENTER_IMG_Y = 540
 
 def findFace(img):
     faceCascade = cv2.CascadeClassifier("codes/face_tracking/haarcascades/haarcascade_frontalface_default.xml")
@@ -16,17 +20,17 @@ def findFace(img):
     
     if len(faces_area_list) > 0:
         i = faces_area_list.index(max(faces_area_list))
-        return img, [faces_center_list, faces_area_list[i]]
+        return img, faces_center_list[i], faces_area_list[i]
     else:
-        return img, [[0,0], 0]
+        return img, [0,0], 0
     
-vid = cv2.VideoCapture(0)
+vid = cv2.VideoCapture(1)
 
 while True:
     ret, img = vid.read()
     (h, w) = img.shape[:2]
     cv2.circle(img, (w//2, h//2), 7, (255, 255, 255), -1)
-    proc_img, face_info = findFace(img)
-    print("Center: {} - Area: {}".format(face_info[0], face_info[1]))
+    proc_img, face_center, face_area= findFace(img)
+    print("D_X: {} \t D_Y: {} \t A: {}".format(CENTER_IMG_X-face_center[0], CENTER_IMG_Y-face_center[1], face_area))
     cv2.imshow('stream', proc_img)
     cv2.waitKey(1)
