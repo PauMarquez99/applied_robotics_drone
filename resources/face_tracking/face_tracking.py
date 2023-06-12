@@ -1,10 +1,14 @@
-from djitellopy import Tello
+from djitellopy import tello
 import cv2, math, time
 
+upper_limit = 15000
+lower_limit = 10000
+area_list = [(upper_limit + lower_limit)/2] * 3
 
 def FindFace(img):
     faceCascade = cv2.CascadeClassifier("codes/face_tracking/haarcascades/haarcascade_frontalface_default.xml")
-    imgGray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    #imgRGB = cv2.cvtColor(img,cv2.COLOR_YUV2RGB)
+    imgGray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
     faces = faceCascade.detectMultiScale(imgGray, 1.2, 8)
 
     faces_center_list = []
@@ -22,41 +26,37 @@ def FindFace(img):
     else:
         return img, [[0,0], 0]
 
-def Closeness(area_avg):
-    if area_avg < 75000:
-        move = "forward"
-        #tello.move_forward(10)
-    elif area_avg > 60000:
-        move = "backwards"
-        #tello.move_back(10)
-    else:
-        move = "nada"
-    return move
-
 def GetAreaAvg(curr_area):
     global area_list
     area_list = area_list[-1:] +  area_list[:-1]
     area_list[0] = curr_area
     return sum(area_list) / len(area_list)
 
-tello = Tello()
+tello = tello.Tello()
 tello.connect()
+tello.set_video_fps(tello.FPS_30)
 tello.streamon()
-frame_read = tello.get_frame_read()
 
-area_list = [67000] * 10
+if tello.get_battery() > 20:
+    img_read = tello.get_frame_read()
+    # tello.takeoff()
 
-while True:
-    key = cv2.waitKey(1)
-    if key == 27:  # ESC
-        break
-    img = tello.get_frame_read().frame
-    proc_img, face_info = FindFace(img)
-    move = Closeness(GetAreaAvg(face_info[1]))
-    print("Center: {} - Area: {} - Move: {}".format(face_info[0], face_info[1], move))
-    cv2.imshow('stream', proc_img)
+    while True:
+        key = cv2.waitKey(1)
+        if key == 27:  # ESC
+            break
+        img = img_read.frame
+        (h, w) = img.shape[:2]
+        # print("x: {} - y: {}".format(w//2, h//2))
 
+        proc_img, face_info = FindFace(img)
+        # print(face_info[0])
+        print(face_info[1])
+        # # move = Closeness(area_avg)
+        # print("Center: {} - Area: {} - Average {}".format(face_info[0], face_info[1], area_avg))
+        cv2.imshow('stream', img)
 
-tello.end()
-cv2.destroyAllWindows()
-#tello.land()
+    cv2.destroyAllWindows()
+
+# tello.land()
+# tello.end()

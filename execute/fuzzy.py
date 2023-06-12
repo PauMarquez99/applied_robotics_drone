@@ -17,10 +17,10 @@ show_video = False
 print_res_find_face = False
 print_res_fuzzy = False
 
-avg_area = [0] * 5
-avg_lr = [0] * 5
-avg_yaw = [0] * 5
-avg_ud = [22000] * 5
+avg_area = [0] * 3
+avg_lr = [0] * 3
+avg_yaw = [0] * 3
+avg_ud = [22000] * 3
 
 
 ############### CONSTANTS ###############
@@ -60,15 +60,15 @@ INPUT_FIG_CF = [
 ]
 
 RULES_LR = {
-    "left":  -20,
+    "left":  -30,
     "med":    0,
-    "right":  20,
+    "right":  30,
 }
 
 RULES_UD = {
-    "down":  42,
+    "down":  50,
     "med":   0,
-    "up":   -42,
+    "up":   -50,
 }
 
 RULES_CF = {
@@ -89,7 +89,7 @@ def findFace():
     global print_res_find_face
 
     if find_face:
-        faceCascade = cv2.CascadeClassifier("codes/face_tracking/haarcascades/haarcascade_frontalface_default.xml")
+        faceCascade = cv2.CascadeClassifier("resources/face_tracking/haarcascades/haarcascade_frontalface_default.xml")
         imgGray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         faces = faceCascade.detectMultiScale(imgGray, 1.2, 7)
 
