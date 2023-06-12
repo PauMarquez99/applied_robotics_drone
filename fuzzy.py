@@ -1,9 +1,9 @@
 import cv2, threading
-
+from djitellopy import tello
 
 ############### GLOBAL VARIABLES ###############
 
-vid = cv2.VideoCapture(1)
+tello = tello.Tello()
 img = 0
 proc_img = 0
 face_center = [0,0]
@@ -17,56 +17,64 @@ show_video = False
 print_res_find_face = False
 print_res_fuzzy = False
 
+avg_area = [0] * 5
+avg_lr = [0] * 5
+avg_yaw = [0] * 5
+avg_ud = [22000] * 5
+
 
 ############### CONSTANTS ###############
 
-CENTER_IMG_X = 960
+CENTER_IMG_X = 480
 
-CENTER_IMG_Y = 540
+CENTER_IMG_Y = 360
 
 INPUT_FIG_LR = [
-    (["left",	"flat"],	    -800, 	-400),
-    (["left", 	"falling"], 	-400, 	0),
-    (["med", 	"rising"], 	    -400, 	0),
-    (["med", 	"falling"], 	0, 	    400),
-    (["right", 	"rising"],		0, 	    400),
-    (["right", 	"flat"],		400, 	800)
+    (["left",	"flat"],	    440, 	 330),
+    (["left", 	"falling"], 	330, 	 110),
+    (["med", 	"rising"], 	    330, 	 110),
+    (["med", 	"flat"], 	    110, 	 -110),
+    (["med", 	"falling"], 	-110, 	 -330),
+    (["right", 	"rising"],		-110, 	 -330),
+    (["right", 	"flat"],		-330, 	 -440)
 ]
 
 INPUT_FIG_UD = [
-    (["down",	"flat"],	    -400, 	-200),
-    (["down", 	"falling"], 	-200, 	0),
-    (["med", 	"rising"], 	    -200, 	0),
-    (["med", 	"falling"], 	0, 	    200),
-    (["up", 	"rising"],		0, 	    200),
-    (["up", 	"flat"],		200, 	400)
+    (["down",	"flat"],	    320, 	240),
+    (["down", 	"falling"], 	240, 	80),
+    (["med", 	"rising"], 	    240, 	80),
+    (["med", 	"flat"], 	    80, 	-80),
+    (["med", 	"falling"], 	-80, 	-240),
+    (["up", 	"rising"],		-80, 	-240),
+    (["up", 	"flat"],		-240, 	-320)
 ]
 
 INPUT_FIG_CF = [
-    (["close",	"flat"],	    20000, 	50000),
-    (["close", 	"falling"], 	50000, 	70000),
-    (["med", 	"rising"], 	    50000, 	70000),
-    (["med", 	"falling"], 	70000, 	200000),
-    (["far", 	"rising"],		70000, 	200000),
-    (["far", 	"flat"],		200000, 700000)
+    (["close",	"flat"],	    2000, 	11000),
+    (["close", 	"falling"], 	11000, 	16500),
+    (["med", 	"rising"], 	    11000, 	16500),
+    (["med", 	"flat"], 	    16500, 	33500),
+    (["med", 	"falling"], 	33500, 	50000),
+    (["far", 	"rising"],		33500, 	50000),
+    (["far", 	"flat"],		50000, 220000)
 ]
 
 RULES_LR = {
-    "left":  -66,
+    "left":  -20,
     "med":    0,
-    "right":  66,
+    "right":  20,
 }
 
 RULES_UD = {
-    "down":  66,
+    "down":  42,
     "med":   0,
-    "up":   -66,
+    "up":   -42,
 }
 
 RULES_CF = {
-    "close": -66,
+    "close":  42,
     "med":    0,
-    "far":    66,
+    "far":   -42,
 }
 
 
@@ -108,10 +116,17 @@ def findFace():
         show_video = True
         print_res_find_face = True
 
-def getFigPos(x, input_fig):
+def getFigPosLRUD(x, input_fig):
     res = []
     for descrip in input_fig:
-        if x < descrip[2] and x >= descrip[1]:
+        if descrip[1] > x >= descrip[2]:
+            res.append(descrip)
+    return res
+
+def getFigPosCF(x, input_fig):
+    res = []
+    for descrip in input_fig:
+        if descrip[1] < x <= descrip[2]:
             res.append(descrip)
     return res
 
@@ -148,14 +163,14 @@ def getFiredRules(membership_values, rules):
 def defuzzifyLR(info):
     output_centers = info[0]
     firing_strengths = info[1]
-    vel_lf = 0
+    vel_lr = 0
     vel_yaw = 0
     for i, o_c in enumerate(output_centers):
-        vel_lf += o_c * firing_strengths[i]
+        vel_lr += o_c * firing_strengths[i]
         vel_yaw += o_c * firing_strengths[i]
     total_memb_val = sum(firing_strengths)
     if total_memb_val > 0:
-        return vel_lf, vel_yaw
+        return vel_lr, vel_yaw
     else:
         return 0, 0
 
@@ -180,18 +195,17 @@ def fuzzify():
     if fuzzy:
         x = CENTER_IMG_X-face_center[0]
         y = CENTER_IMG_Y-face_center[1]
-        a = face_area
 
-        descriptions_LR = getFigPos(x, INPUT_FIG_LR)
+        descriptions_LR = getFigPosLRUD(x, INPUT_FIG_LR)
         membership_values_LR = getMembershipValues(descriptions_LR, x)
         info_LR = getFiredRules(membership_values_LR, RULES_LR)
 
-        descriptions_UD = getFigPos(y, INPUT_FIG_UD)
+        descriptions_UD = getFigPosLRUD(y, INPUT_FIG_UD)
         membership_values_UD = getMembershipValues(descriptions_UD, y)
         info_UD = getFiredRules(membership_values_UD, RULES_UD)
 
-        descriptions_CF = getFigPos(a, INPUT_FIG_CF)
-        membership_values_CF = getMembershipValues(descriptions_CF, a)
+        descriptions_CF = getFigPosCF(face_area, INPUT_FIG_CF)
+        membership_values_CF = getMembershipValues(descriptions_CF, face_area)
         info_CF = getFiredRules(membership_values_CF, RULES_CF)
         
         lr_y = defuzzifyLR(info_LR)
@@ -204,14 +218,47 @@ def getVideo():
     global img
     global find_face
 
-    _, img = vid.read()
+    img = img_read.frame
     (h, w) = img.shape[:2]
     cv2.circle(img, (w//2, h//2), 7, (255, 255, 255), -1)
 
     find_face = True
 
+def getAvgArea(area):
+    global avg_area
+
+    avg_area = avg_area[-1:] +  avg_area[:-1]
+    avg_area[0] = area
+    return sum(avg_area) / len(avg_area)
+
+def getAvgLR(lr):
+    global avg_lr
+
+    avg_lr = avg_lr[-1:] +  avg_lr[:-1]
+    avg_lr[0] = lr
+    return sum(avg_lr) / len(avg_lr)
+
+def getAvgUD(ud):
+    global avg_ud
+
+    avg_ud = avg_ud[-1:] +  avg_ud[:-1]
+    avg_ud[0] = ud
+    return sum(avg_ud) / len(avg_ud)
+
+def getAvgYaw(y):
+    global avg_yaw
+
+    avg_yaw = avg_yaw[-1:] +  avg_yaw[:-1]
+    avg_yaw[0] = y
+    return sum(avg_yaw) / len(avg_yaw)
 
 ############### MAIN ###############
+
+tello.connect()
+tello.set_video_fps(tello.FPS_30)
+tello.streamon()
+img_read = tello.get_frame_read()
+tello.takeoff()
 
 while True:
     t_get_video = threading.Thread(target=getVideo, args=())
@@ -219,8 +266,14 @@ while True:
     t_fuzzify = threading.Thread(target=fuzzify, args=())
 
     if print_res_fuzzy and print_res_find_face:
-        print("D_X: {} \t D_Y: {} \t A: {}\n".format(CENTER_IMG_X-face_center[0], CENTER_IMG_Y-face_center[1], face_area))
-        print("V_LF: {} - V_Y: {} - V_UD: {} - V_CF: {}".format(int(lr_y[0]), int(lr_y[1]), int(vel_ud), int(vel_cf)))
+        lr =  int(getAvgLR(lr_y[0]))
+        cf =  int(getAvgArea(vel_cf))
+        ud =  int(getAvgUD(vel_ud))
+        yaw = int(getAvgYaw(lr_y[1]))
+
+        print("\nD_X: {} \t D_Y: {} \t A: {}".format(CENTER_IMG_X-face_center[0], CENTER_IMG_Y-face_center[1], face_area))
+        print("V_LR: {} - V_CF: {} - V_UD: {} - V_Y: {}".format(lr, cf, ud, yaw))
+        tello.send_rc_control(lr, cf, ud, yaw)
 
     t_get_video.start()
     t_find_face.start()
@@ -235,3 +288,8 @@ while True:
 
     if cv2.waitKey(1) == 27:
         break
+
+cv2.destroyAllWindows()
+tello.land()
+tello.streamoff()
+tello.end()
